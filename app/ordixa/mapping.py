@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+from app.ordixa.adapters import malformed_message
 from app.ordixa.issues import ERROR, EXCLUDED, WARNING, Issue
 from app.ordixa.normalize import (
     NormalizationError,
@@ -441,7 +442,11 @@ def canonicalize(table, spec, profile):
         record.add_issue(
             ERROR,
             "malformed_row",
-            "row has a different number of cells than the header",
+            malformed_message(
+                table,
+                row_number,
+                "row has a different number of cells than the header",
+            ),
         )
         records.append(record)
 

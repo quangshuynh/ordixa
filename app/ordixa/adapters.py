@@ -33,6 +33,28 @@ class SourceTable:
     header: tuple[str, ...]
     rows: tuple[SourceRow, ...]
     malformed_rows: tuple[int, ...] = ()
+    # (first line, last line) of malformed rows that span several physical
+    # lines, almost always because a quote character was never closed
+    malformed_spans: tuple[tuple[int, int], ...] = ()
+
+
+def malformed_message(table, row, default):
+    """
+    explains why a malformed row was not used
+    :param table: source table holding the row
+    :param row: malformed row number
+    :param default: message for a row on a single line
+    :returns: explanation naming the affected line range when there is one
+    """
+    for first, last in table.malformed_spans:
+        if first == row:
+            return (
+                f"lines {first}-{last} were read as one row because a quote "
+                f'character (") on or after line {first} is not balanced; '
+                "none of these lines were used. Fix the quote in the source "
+                "export and run again"
+            )
+    return default
 
 
 def file_sha256(path):
@@ -156,19 +178,59 @@ def check_header(header, spec, path):
         )
 
 
+def swallowed_rows(cells, width):
+    """
+    checks whether a multi-line cell contains what look like whole CSV rows
+
+    a stray or unbalanced quote makes the CSV reader keep reading into the
+    following lines, so later records end up inside one cell instead of being
+    parsed; a legitimate multi-line note rarely holds a full row of delimiters
+    :param cells: cells of one parsed record
+    :param width: number of header columns
+    :returns: true when a cell appears to hold swallowed records
+    """
+    if width < 2:
+        return False
+    return any(
+        line.count(",") >= width - 1
+        for cell in cells
+        if "\n" in cell
+        for line in cell.split("\n")[1:]
+    )
+
+
+def unterminated_quote(text):
+    """
+    checks whether CSV text ends inside a quoted value
+    :param text: decoded CSV text
+    :returns: true when the final quoted value is never closed
+    """
+    try:
+        for _ in csv.reader(io.StringIO(text, newline=""), strict=True):
+            pass
+    except csv.Error as error:
+        return "unexpected end of data" in str(error)
+    return False
+
+
 def read_csv_table(path, spec, encoding, data=None):
     """
     reads a CSV export keeping every cell as the exact source text
+
+    a row that spans several lines because of an unbalanced quote is reported
+    as malformed with its line range rather than silently absorbing the rows
+    after it
     :param path: CSV file path
     :param spec: dataset specification
     :param encoding: text encoding declared by the profile
     :param data: file bytes already read, or none to read the file
-    :returns: tuple of rows, header, and malformed row numbers
+    :returns: tuple of rows, header, malformed row numbers, and malformed spans
     """
     if data is None:
         data = path.read_bytes()
     try:
-        with io.StringIO(data.decode(encoding), newline="") as handle:
+        text = data.decode(encoding)
+        with io.StringIO(text, newline="") as handle:
             reader = csv.reader(handle)
             header_cells = next(reader, None)
             if header_cells is None:
@@ -178,14 +240,34 @@ def read_csv_table(path, spec, encoding, data=None):
 
             rows = []
             malformed = []
+            spans = []
+            last_record = None
+            previous_line = reader.line_num
             for cells in reader:
                 row_number = reader.line_num
+                first_line = previous_line + 1
+                previous_line = row_number
                 if not any(cell.strip() for cell in cells):
                     continue
-                if len(cells) != len(header):
-                    malformed.append(row_number)
+                multi_line = row_number > first_line
+                last_record = (first_line, row_number, multi_line)
+                if len(cells) != len(header) or (
+                    multi_line and swallowed_rows(cells, len(header))
+                ):
+                    if multi_line:
+                        malformed.append(first_line)
+                        spans.append((first_line, row_number))
+                    else:
+                        malformed.append(row_number)
                     continue
                 rows.append(SourceRow(row_number, dict(zip(header, cells))))
+
+            if last_record and last_record[2] and unterminated_quote(text):
+                first_line, last_line, _ = last_record
+                if first_line not in malformed:
+                    rows = [row for row in rows if row.row != last_line]
+                    malformed.append(first_line)
+                    spans.append((first_line, last_line))
     except UnicodeDecodeError as error:
         raise InputError(
             f"{path.name} is not valid {encoding} text: {error.reason}"
@@ -193,7 +275,7 @@ def read_csv_table(path, spec, encoding, data=None):
     except csv.Error as error:
         raise InputError(f"{path.name} could not be parsed as CSV: {error}") from error
 
-    return rows, header, malformed
+    return rows, header, sorted(malformed), tuple(sorted(spans))
 
 
 def read_xlsx_table(path, spec, data=None):
@@ -202,7 +284,7 @@ def read_xlsx_table(path, spec, data=None):
     :param path: workbook path
     :param spec: dataset specification
     :param data: file bytes already read, or none to read the file
-    :returns: tuple of rows, header, and malformed row numbers
+    :returns: tuple of rows, header, malformed row numbers, and spans (none)
     """
     if data is None:
         data = path.read_bytes()
@@ -245,7 +327,7 @@ def read_xlsx_table(path, spec, data=None):
     finally:
         workbook.close()
 
-    return rows, header, malformed
+    return rows, header, malformed, ()
 
 
 def read_table(path, spec, profile):
@@ -271,9 +353,11 @@ def read_table(path, spec, profile):
 
     sha256 = hashlib.sha256(data).hexdigest()
     if path.suffix.lower() == ".xlsx":
-        rows, header, malformed = read_xlsx_table(path, spec, data)
+        rows, header, malformed, spans = read_xlsx_table(path, spec, data)
     else:
-        rows, header, malformed = read_csv_table(path, spec, profile.csv_encoding, data)
+        rows, header, malformed, spans = read_csv_table(
+            path, spec, profile.csv_encoding, data
+        )
 
     return SourceTable(
         role=spec.role,
@@ -282,4 +366,5 @@ def read_table(path, spec, profile):
         header=header,
         rows=tuple(rows),
         malformed_rows=tuple(malformed),
+        malformed_spans=spans,
     )

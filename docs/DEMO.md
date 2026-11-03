@@ -118,6 +118,10 @@ adjustment breakdown.
 Transaction IDs, Last payment date, and Source are left out of this capture
 for width.*
 
+The demo then separates what Ordixa settled automatically (orders fully
+paid with no flags, cross-checked totals) from what a person still reviews:
+the exceptions, each rejected row by issue code, warnings, and excluded rows.
+
 ### 7. Manifest and result verification
 
 `manifest.json` records the profile checksum, every input's SHA-256 and row

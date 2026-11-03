@@ -4,6 +4,22 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/). Dates are UTC.
 
+## [Unreleased]
+
+### Fixed
+
+- A CSV quote that is never closed, or one closed several lines later, no
+  longer absorbs the following rows into a single cell. The affected lines
+  are rejected together as `malformed_row` with their line range, in `run`,
+  `check-profile --input`, `clean`, and `compare`.
+
+### Added
+
+- `run` notes input files with identical contents (their rows are counted
+  once) and staging folders left by an interrupted run.
+- The guided demo ends its workbook step with what Ordixa settled
+  automatically and what still needs human review.
+
 ## [2.0.0] - 2026-10-17
 
 Ordixa 2.0.0 expands the original financial reconciliation engine into a

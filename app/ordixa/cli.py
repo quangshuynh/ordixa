@@ -567,6 +567,52 @@ def verify_command(args):
     return EXIT_OK
 
 
+def report_identical_inputs(inputs):
+    """
+    notes input files whose bytes are identical, such as a re-sent export
+
+    their rows are exact duplicates, so each is counted once and the copies are
+    listed as duplicate_row; the note explains why at the file level
+    :param inputs: processed input files
+    :returns: none
+    """
+    first = {}
+    for item in inputs:
+        key = (item.role, item.sha256)
+        if key in first:
+            report(
+                f"note: {item.name} has exactly the same contents as "
+                f"{first[key]}; its rows were counted once and listed as "
+                "duplicate_row"
+            )
+        else:
+            first[key] = item.name
+
+
+def report_interrupted_runs(out_dir):
+    """
+    notes staging folders left by a run that was interrupted before publishing
+
+    they are never results: a run is only published as run-<id> once every
+    output and the manifest are complete
+    :param out_dir: parent output directory
+    :returns: none
+    """
+    out_dir = Path(out_dir)
+    if not out_dir.is_dir():
+        return
+    leftovers = sorted(
+        path.name for path in out_dir.glob(".run-*.partial") if path.is_dir()
+    )
+    if leftovers:
+        report(
+            f"note: {len(leftovers)} incomplete folder(s) from an interrupted run "
+            f"in {out_dir} ({', '.join(leftovers)}); they are not results and "
+            "can be deleted",
+            sys.stderr,
+        )
+
+
 def run_command(args):
     """
     executes the run subcommand
@@ -584,11 +630,13 @@ def run_command(args):
     result = process(profile, args.input)
     for item in result.inputs:
         report(f"read {item.role}: {item.name} ({item.data_rows} rows)")
+    report_identical_inputs(result.inputs)
     if result.ignored_files:
         report(f"ignored {len(result.ignored_files)} file(s) matching no dataset")
     if "customers" not in result.records:
         report("no customers file provided; orders reconciled without customer data")
 
+    report_interrupted_runs(args.out)
     run_dir, manifest = write_run_outputs(result, args.out, started_at)
     report_run(result, run_dir, manifest)
     report_next_step(run_dir, [args.input])

@@ -276,7 +276,7 @@ amounts; a refund with the wrong sign is rejected.
 
 | Severity | Effect | Examples |
 | --- | --- | --- |
-| Error (blocking) | row rejected, not reconciled | invalid or missing identifier, amount, or order date; unmapped status or type; currency mismatch; refund sign; non-positive total; payment for a rejected order or an order not in this run; conflicting duplicate identifiers |
+| Error (blocking) | row rejected, not reconciled | invalid or missing identifier, amount, or order date; unmapped status or type; currency mismatch; refund sign; non-positive total; payment for a rejected order or an order not in this run; conflicting duplicate identifiers; malformed CSV row, including every line absorbed by an unbalanced quote |
 | Warning | row kept and reconciled | malformed email, missing or non-10-digit phone, missing name, unknown or rejected customer reference (default), unreadable optional payment date, blank currency |
 | Excluded | row omitted from totals on purpose | statuses listed in `excluded_statuses`, such as `Failed` or `Voided` |
 
