@@ -6,6 +6,7 @@ run with: python -m app.ordixa.demo
 
 import argparse
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from app.ordixa.cli import (
     report_run,
 )
 from app.ordixa.inspection import DEFAULT_MAX_ROWS, format_report, inspect_path
+from app.ordixa.issues import ERROR, EXCLUDED, WARNING
 from app.ordixa.manifest import WORKBOOK_NAME, verify_run, write_run_outputs
 from app.ordixa.pipeline import process
 from app.ordixa.profile import load_profile
@@ -49,6 +51,57 @@ def relative(path):
         return str(Path(path).resolve().relative_to(PROJECT_ROOT))
     except ValueError:
         return str(path)
+
+
+def code_counts(issues, severity):
+    """
+    counts issue codes of one severity for the review handoff
+    :param issues: run issues
+    :param severity: error, warning, or excluded
+    :returns: text such as duplicate_row 2, invalid_amount 1
+    """
+    counts = Counter(issue.code for issue in issues if issue.severity == severity)
+    return ", ".join(f"{code} {count}" for code, count in sorted(counts.items()))
+
+
+def review_handoff(result):
+    """
+    separates what the run settled automatically from what a person must review
+    :param result: run result
+    :returns: list of lines to print
+    """
+    summary = result.summary
+    statuses = summary["status_counts"]
+    clean = summary["orders"] - summary["exception_orders"]
+    rows = sum(item.data_rows for item in result.inputs)
+    unsettled = statuses["partial"] + statuses["unpaid"] + statuses["overpaid"]
+    flagged_paid = summary["exception_orders"] - unsettled
+    lines = [
+        "  Automated by Ordixa:",
+        f"    read {len(result.inputs)} exports ({rows} rows) and normalized IDs, "
+        "dates, and amounts exactly",
+        f"    reconciled {summary['orders']} orders; {clean} fully paid with no "
+        "flags need no action",
+        "    cross-checked every total against the accepted rows",
+        "  Needs human review:",
+        f"    {summary['exception_orders']} order(s) on the Exceptions sheet "
+        f"({statuses['partial']} partial, {statuses['unpaid']} unpaid, "
+        f"{statuses['overpaid']} overpaid, "
+        f"{flagged_paid} paid with a discrepancy flag)",
+    ]
+    for label, key, severity in (
+        ("rejected row(s), not counted in any total", "rejected_rows", ERROR),
+        ("row(s) kept with warnings", "warning_rows", WARNING),
+        ("row(s) excluded by the profile (moved no money)", "excluded_rows", EXCLUDED),
+    ):
+        if summary[key]:
+            codes = code_counts(result.issues, severity)
+            lines.append(f"    {summary[key]} {label}: {codes}")
+    lines.append(
+        "  Ordixa never matches a payment by amount, date, or customer; uncertain"
+    )
+    lines.append("  rows stay rejected and listed until a person decides.")
+    return lines
 
 
 def build_parser():
@@ -123,6 +176,9 @@ def main(argv=None):
     print("  Exceptions - orders to follow up, each with a note on what to check")
     print("  Rejected Rows - every rejected, warned, or excluded row and why")
     print("  Full Ledger - every reconciled order with its transactions")
+    print()
+    for line in review_handoff(result):
+        print(line)
 
     step(7, "Manifest and result verification")
     checks = verify_run(run_dir, DEMO_INPUT)

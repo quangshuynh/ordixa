@@ -16,7 +16,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from app.ordixa.adapters import read_table
+from app.ordixa.adapters import malformed_message, read_table
 from app.ordixa.issues import InputError
 from app.ordixa.normalize import (
     MAX_EXACT_FLOAT_ID,
@@ -434,7 +434,12 @@ def clean_table(profile, path, role="input"):
     }
     issues = [
         TableIssue(
-            role, name, row, REJECTED, "malformed_row", MESSAGES["malformed_row"]
+            role,
+            name,
+            row,
+            REJECTED,
+            "malformed_row",
+            malformed_message(table, row, MESSAGES["malformed_row"]),
         )
         for row in table.malformed_rows
     ]
