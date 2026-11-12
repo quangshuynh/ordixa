@@ -283,8 +283,9 @@ def validate_date_format(date_format, path, problems):
         problems.append(f"{path}: '{date_format}' must contain a day and a month")
         return
 
-    probe = DATE_PROBE.strftime(date_format.replace("%z", "+0000"))
     try:
+        # some platforms reject unknown directives in strftime as well
+        probe = DATE_PROBE.strftime(date_format.replace("%z", "+0000"))
         parsed = datetime.strptime(probe, date_format.replace("%z", "+0000"))
     except ValueError:
         problems.append(f"{path}: '{date_format}' is not a valid date format")
