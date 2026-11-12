@@ -36,6 +36,10 @@ network access is needed.
 | **Clean** one table | `clean` | an inconsistent CSV/XLSX export | a typed, standardized CSV plus every held-back row and why |
 | **Compare** two versions | `compare` | last week's and this week's export | added, removed, and modified records by business key, in a change report |
 
+Each workflow can be run from the command line or from the
+[local workspace](docs/WORKSPACE.md), a browser page for people who would
+rather not use a terminal. It runs on your own computer only.
+
 All three share the same foundation: exact decimal parsing, identifiers kept
 as exact text, duplicates and conflicting records held back instead of
 guessed, formula-injection protection, atomic run directories, and
@@ -81,6 +85,21 @@ python -m pip install -r requirements.txt
 python -m app.ordixa --version
 ```
 
+## Open the workspace
+
+```bash
+python -m app.ordixa workspace
+```
+
+Your browser opens a page where you add files, check how Ordixa will read
+them, run, and download verified results. Three fictional samples are one
+click away. Nothing leaves your computer; see [docs/WORKSPACE.md](docs/WORKSPACE.md).
+
+<p align="center">
+  <img src="docs/images/workspace-results-reconcile.png" width="880"
+       alt="Ordixa workspace results for the fictional Harbor Lane reconciliation: 15 orders checked, 9 paid in full, 3 part-paid, 2 unpaid, 1 overpaid, with exact money totals">
+</p>
+
 ## Try it on fictional data
 
 Each demo runs end to end and verifies its own output:
@@ -122,6 +141,7 @@ missing columns or unreadable records are never passed off as unchanged.
 
 | Document | Contents |
 | --- | --- |
+| [docs/WORKSPACE.md](docs/WORKSPACE.md) | The local browser workspace: walkthrough, privacy and security, failure handling |
 | [docs/ORDIXA.md](docs/ORDIXA.md) | CLI reference, exit codes, reconciliation profiles, preflight, workbook, manifests |
 | [docs/SPREADSHEET_WORKFLOWS.md](docs/SPREADSHEET_WORKFLOWS.md) | `clean` and `compare`: table profiles, previews, comparison result, outputs |
 | [docs/DEMO.md](docs/DEMO.md) | Harbor Lane walkthrough, hand-computed results, screenshot gallery |
@@ -148,8 +168,9 @@ validated customer deployments yet.
   vendor layouts without being official Shopify, Square, Stripe, or
   QuickBooks exports. Each real format needs a profile checked against
   samples.
-- **A command-line tool**, run from a source checkout by an operator; no
-  hosted app, accounts, scheduling, or vendor connectors.
+- **Runs from a source checkout**, as a command-line tool or a local
+  browser workspace for one person on one computer; no hosted app,
+  accounts, scheduling, or vendor connectors.
 
 Full lists: [reconciliation](docs/ORDIXA.md#known-limitations) and
 [spreadsheet workflows](docs/SPREADSHEET_WORKFLOWS.md#known-limitations).

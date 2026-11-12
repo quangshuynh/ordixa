@@ -59,6 +59,17 @@ jobs:
           test -z "$(find output/ci -mindepth 1 -maxdepth 1 -name '.run-*')"
           test -z "$(git status --porcelain)"
 
+      - name: Local workspace smoke test
+        run: |
+          python -m app.ordixa workspace --help
+          python -m app.ordixa workspace --no-browser --port 8765 --data-dir "$RUNNER_TEMP/workspace" &
+          for attempt in $(seq 1 30); do curl -sf http://127.0.0.1:8765/ -o /dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:8765/ | grep -q "Ordixa Workspace"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/api/sessions)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: attacker.example' http://127.0.0.1:8765/)" = "421"
+          kill %1
+          test -z "$(git status --porcelain)"
+
       - name: Spreadsheet clean/compare smoke test
         run: |
           python -m app.ordixa check-profile --profile examples/ordixa/profiles/inventory-clean.toml --input examples/ordixa/exports/inventory/inventory-after.csv

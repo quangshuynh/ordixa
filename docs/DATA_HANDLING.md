@@ -29,6 +29,14 @@ They are collected, with suggested defaults, in the approval checklist
   profile does not map are never copied into any output, so leave
   unneeded columns unmapped. Their manifests hold no row values.
 
+The [local workspace](WORKSPACE.md) follows the same rules. It listens
+only on `127.0.0.1`, and keeps copies of the files you add, the settings,
+and every run in its data directory (by default the git-ignored
+`customer-data/workspace/`). Treat that directory like any folder of
+customer exports and run outputs: the storage, retention, and deletion
+guidance below applies to it, and *Remove* in the workspace deletes a piece
+of work's folder.
+
 ## Receiving files
 
 1. Agree in writing which exports are needed, for which period, and why.
