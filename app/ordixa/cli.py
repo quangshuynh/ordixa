@@ -306,6 +306,36 @@ def build_parser():
         ),
     )
     inspect.add_argument("--json", action="store_true", help="print the report as JSON")
+
+    workspace = command(
+        "workspace",
+        "open the local visual workspace in a web browser",
+        "Starts a small web server on this computer only (127.0.0.1) and opens "
+        "a browser page for choosing files, matching columns, checking, and "
+        "running clean, compare, and reconcile. Runs use these same commands, "
+        "so every run directory and manifest is identical to the CLI's. No "
+        "account is needed and nothing is sent anywhere.",
+    )
+    workspace.add_argument(
+        "--port",
+        type=port_number,
+        default=8765,
+        help="local port to listen on (default 8765)",
+    )
+    workspace.add_argument(
+        "--data-dir",
+        type=Path,
+        default=None,
+        help=(
+            "folder for added files and results (default customer-data/workspace, "
+            "which git ignores)"
+        ),
+    )
+    workspace.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="start the server without opening a browser window",
+    )
     return parser
 
 
@@ -334,6 +364,9 @@ EXAMPLES = {
   python -m app.ordixa compare --profile {P}/inventory-compare.toml \\
       --before {X}/inventory/inventory-before.csv \\
       --after {X}/inventory/inventory-after.csv --out output/compare""",
+    "workspace": """examples:
+  python -m app.ordixa workspace
+  python -m app.ordixa workspace --port 8800 --data-dir customer-data/workspace""",
     "verify": f"""examples:
   python -m app.ordixa verify --run output/runs/run-<id> --input {X}/problematic
   python -m app.ordixa verify --run output/compare/run-<id> \\
@@ -343,6 +376,7 @@ MAIN_EPILOG = """workflows:
   reconcile  inspect -> check-profile --input DIR -> run -> verify
   clean      inspect -> check-profile --input FILE -> clean -> verify
   compare    check-profile --before A --after B -> compare -> verify
+  any        workspace: the same steps in a local browser page
 
 exit codes:
   0  success (rows may still have been rejected; read the summary)
@@ -395,6 +429,33 @@ def positive_int(text):
     if value < 1:
         raise argparse.ArgumentTypeError("must be at least 1")
     return value
+
+
+def port_number(text):
+    """
+    parses a TCP port command line value
+    :param text: argument text
+    :returns: integer from 1024 to 65535
+    """
+    value = positive_int(text)
+    if not 1024 <= value <= 65535:
+        raise argparse.ArgumentTypeError("must be from 1024 to 65535")
+    return value
+
+
+def workspace_command(args):
+    """
+    starts the local visual workspace
+    :param args: parsed arguments
+    :returns: exit code
+    """
+    from app.workspace.server import DEFAULT_DATA_DIR, serve
+
+    try:
+        serve(args.data_dir or DEFAULT_DATA_DIR, args.port, not args.no_browser)
+    except KeyboardInterrupt:
+        report("workspace stopped")
+    return EXIT_OK
 
 
 def inspect_command(args):
@@ -843,6 +904,8 @@ def main(argv=None):
             return clean_command(args)
         if args.command == "compare":
             return compare_command(args)
+        if args.command == "workspace":
+            return workspace_command(args)
         return run_command(args)
     except ProfileError as error:
         report(str(error), sys.stderr)
