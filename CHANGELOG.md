@@ -6,7 +6,22 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Local workspace** (`python -m app.ordixa workspace`): a browser page for
+  clean, compare, and reconcile that runs on this computer only. Add CSV or
+  .xlsx files and preview them, choose columns and value formats with
+  suggestions from the file, check with the read-only preflight, run, stop a
+  run, and read plain-language results with verified downloads. Settings are
+  ordinary profiles that can be saved and loaded, and runs use the unchanged
+  CLI, so run directories and manifests are identical. See
+  [docs/WORKSPACE.md](docs/WORKSPACE.md).
+
 ### Fixed
+
+- A date format with a directive the platform's `strftime` rejects (such as
+  `%Q` on Windows) is reported as a profile problem (exit code 2) instead of
+  an unexpected error.
 
 - A CSV quote that is never closed, or one closed several lines later, no
   longer absorbs the following rows into a single cell. The affected lines

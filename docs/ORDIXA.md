@@ -72,6 +72,7 @@ python -m app.ordixa compare --profile examples/ordixa/profiles/inventory-compar
 | `verify` | re-check a finished run against its manifest; `--input` may repeat |
 | `clean` | standardize one CSV/XLSX table with a clean profile |
 | `compare` | report added, removed, and modified records between two exports |
+| `workspace` | open the [local browser workspace](WORKSPACE.md) for clean, compare, and reconcile; it runs these same commands |
 
 `python -m app.ordixa --version` prints the application version, and every
 command's `--help` ends with copyable examples. Successful `run`, `clean`,

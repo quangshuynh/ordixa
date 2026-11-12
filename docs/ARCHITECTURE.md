@@ -40,6 +40,7 @@ app/
 ├── api/             HTTP routes, dependencies, and response schemas
 ├── db/              SQLAlchemy models, sessions, and persistence
 ├── ordixa/          profile-driven imports, spreadsheet clean/compare, workbooks, manifests, CLI
+├── workspace/       local browser workspace over the Ordixa CLI (server, storage, static page)
 ├── reconciliation/  financial calculations and report construction
 ├── services/        database-to-business-logic coordination
 ├── validators/      structural and record-level validation
@@ -71,6 +72,33 @@ comparison as complete, complete with warnings, or incomplete.
 before/after pair processed in memory), and `explain.py` backs
 `check-profile --explain` for both profile kinds. `inventory_demo.py` is
 their guided demo. None of them touch the reconciliation engine.
+
+`app/workspace` is the [local workspace](WORKSPACE.md), started with
+`python -m app.ordixa workspace`. It is a layer over the engine, not a second
+implementation: `server.py` (FastAPI, loopback only) serves a plain
+HTML/CSS/JavaScript page from `static/`; `store.py` keeps each piece of work
+in its own folder under the git-ignored data directory; `preview.py`
+describes added files using `inspection.py`; `profiles.py` builds profile
+documents from the choices on screen and validates them through TOML with
+the engine's own loaders (`toml_writer.py` writes the TOML); the check step
+calls `preflight` and `table_preflight`; `jobs.py` runs the unchanged CLI
+(`clean`, `compare`, `run`) in a child process so runs can be stopped and
+every run directory is the CLI's; and `results.py` reads finished runs back
+from their manifests and CSV artifacts, with `verify_run` behind the
+verification badge.
+
+```mermaid
+flowchart LR
+    Browser[Browser page] -->|127.0.0.1 only| Server[Workspace server]
+    Server --> Store[(Session folders)]
+    Server --> Inspect[inspection]
+    Server --> Profiles[Profile loaders]
+    Server --> Preflight[preflight / table_preflight]
+    Server --> Jobs[Child process: python -m app.ordixa clean / compare / run]
+    Jobs --> Runs[run-id directories and manifests]
+    Server --> Verify[verify_run]
+    Verify --> Runs
+```
 
 `scripts/capture_screenshots.py` is a maintainer tool that regenerates the
 documentation images from a real demo run. `scripts/release_check.py` is the
@@ -362,6 +390,15 @@ The suite covers:
 - Compatibility with runs written before 2.0.0: stored run directories in
   `tests/fixtures/runs-0.1.0` must still verify, and the current engine must
   reproduce their fingerprints, deterministic artifacts, and workbook values
+- The local workspace: workspace runs reproduce engine runs exactly (result
+  fingerprints and deterministic checksums), saved settings work with the
+  CLI, downloads are the verified bytes and changed outputs are refused,
+  amounts stay exact text, profiles round-trip through TOML and the engine
+  loaders, refused, oversized, damaged, and duplicate files, blocked checks,
+  stopped, timed-out, failed, and interrupted runs, and the security model
+  (host check, cookie and token, cross-site refusal, headers, no external
+  resources, no HTML rendering of file contents, safe file names, path
+  confinement, size limits, loopback binding)
 - The release gate: version and tag consistency, changelog, documentation
   links and commands, and tracked-file checks for secrets and customer data
 
